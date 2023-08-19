@@ -16,4 +16,18 @@
         app:use_controller="true"
         app:surface_type="texture_view"/>
 
+    <TextView
+        android:id="@+id/tvSubsStat"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Subscription Status: "
+        android:textAlignment="center"
+        android:textColor="@color/white"
+        android:textSize="20sp"
+        app:layout_constraintTop_toTopOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        android:layout_marginBottom="250dp" />
+
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -1,5 +1,6 @@
 package com.example.exoplayer_matomo
 
+import android.content.Context
 import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
@@ -13,34 +14,131 @@ import com.google.android.exoplayer2.Player
 import com.google.android.exoplayer2.ext.ima.ImaAdsLoader
 import com.google.android.exoplayer2.source.DefaultMediaSourceFactory
 import com.google.android.exoplayer2.source.MediaSource
+import com.google.android.exoplayer2.trackselection.AdaptiveTrackSelection
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector
 import com.google.android.exoplayer2.upstream.DataSource
 import com.google.android.exoplayer2.upstream.DefaultDataSource
 import com.google.android.exoplayer2.util.MimeTypes
 import com.google.android.exoplayer2.util.Util
+import org.matomo.sdk.QueryParams
 import org.matomo.sdk.TrackMe
+import org.matomo.sdk.extra.TrackHelper
 
 class MainActivity : AppCompatActivity() {
 
-    lateinit var binding:ActivityMainBinding
-    lateinit var simpleExoPlayer: ExoPlayer
+    private lateinit var binding: ActivityMainBinding
     lateinit var player: ExoPlayer
-    lateinit var adsLoader: ImaAdsLoader
-    lateinit var analyticsListener : PlayerAnalyticsListener
+    private lateinit var simpleExoPlayer: ExoPlayer
+    private lateinit var adsLoader: ImaAdsLoader
+    private lateinit var analyticsListener: PlayerAnalyticsListener
+    private lateinit var trackSelector: DefaultTrackSelector
 
-    companion object{
-        var mediaEvent = TrackMe()
-    }
+    var userInfoMap = mutableMapOf<String, String>()
+    private var userID: String? = null
+    private var subscriptionStatus: Boolean? = null
 
+
+    companion object{ var mediaEvent = TrackMe()}
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        userInfoMap = checkSharedPrefData()
+        checkException(userInfoMap)
+
+        PlayerUtils.getTracker(this@MainActivity)!!.defaultTrackMe.set(QueryParams.USER_ID,userInfoMap["userId"])
+        subscriptionStatus = userInfoMap["cd_SubscriptionStatus"].toBoolean()
 
         simpleExoPlayer = ExoPlayer.Builder(this).build()
         adsLoader = ImaAdsLoader.Builder(this).build()
+
+        binding.tvSubsStat.text = if (subscriptionStatus == true) "paid user" else "free user"
     }
+
+
+
+
+    private fun setupExoWithAdd() {
+        trackSelector = DefaultTrackSelector(/* context= */this, AdaptiveTrackSelection.Factory())
+        val params = DefaultTrackSelector.ParametersBuilder().apply {
+            if (subscriptionStatus == false) setMaxVideoSize(1280, 720)
+        }.build()
+        trackSelector.parameters = params
+
+
+        // Set up the factory for media sources, passing the ads loader and ad view providers.
+        val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(this)
+        val mediaSourceFactory: MediaSource.Factory =
+            DefaultMediaSourceFactory(dataSourceFactory)
+                .setLocalAdInsertionComponents(
+                    { adsLoader }, binding.playerView
+                )
+
+        // Create an ExoPlayer and set it as the player for content and ads.
+        player = ExoPlayer
+            .Builder(this)
+            .setMediaSourceFactory(mediaSourceFactory)
+            .setTrackSelector(trackSelector)
+            .build()
+        binding.playerView.player = player
+        adsLoader.setPlayer(player)
+
+        // Create the MediaItem to play, specifying the content URI and ad tag URI.
+        val contentUri = Uri.parse(PlayerUtils.SAMPLE_VIDEO_URL_M3U8)
+        val adTagUri = Uri.parse("")
+        val mediaItem = MediaItem.Builder()
+            .setUri(contentUri)
+            .setMimeType(MimeTypes.APPLICATION_M3U8)
+            .setAdsConfiguration(MediaItem.AdsConfiguration.Builder(adTagUri).build())
+            .build()
+
+//         Prepare the content and ad to be played with the SimpleExoPlayer.
+//        player.setMediaItem(mediaItem)
+        player.setMediaItems(PlayerUtils.mediaItemList)
+        player.addListener(playBackStateListener())
+        analyticsListener = PlayerAnalyticsListener(this,player)
+        player.addAnalyticsListener(analyticsListener)
+        player.prepare()
+        // Set PlayWhenReady. If true, content and ads will autoplay.
+        player.playWhenReady = true
+    }
+
+    private fun playBackStateListener() = object : Player.Listener{
+        override fun onPlaybackStateChanged(playbackState: Int) {
+            if (playbackState == ExoPlayer.STATE_BUFFERING) {
+
+            } else if (playbackState == ExoPlayer.STATE_READY || playbackState == 9 || playbackState == 8){
+
+                mediaEvent.set(PlayerAnalyticsUnit.ma_id.toString(), getRandomString(6))
+                mediaEvent.set(PlayerAnalyticsUnit.ma_re.toString(), PlayerUtils.mediaItemLinks[player.currentMediaItemIndex])
+                mediaEvent.set(PlayerAnalyticsUnit.ma_mt.toString(), "video")
+                mediaEvent.set(PlayerAnalyticsUnit.ma_ti.toString(), "Title: " + PlayerUtils.mediaItemTitle[player.currentMediaItemIndex])
+                mediaEvent.set(PlayerAnalyticsUnit.ma_pn.toString(), "Media3_Flutter")
+
+                mediaEvent.set(PlayerAnalyticsUnit.ma_st.toString(), "0")
+                mediaEvent.set(PlayerAnalyticsUnit.ma_le.toString(), (player.duration.toInt()/1000).toString())
+                mediaEvent.set(PlayerAnalyticsUnit.ma_ps.toString(), (player.currentPosition.toInt()/1000).toString())
+                mediaEvent.set(PlayerAnalyticsUnit.ma_ttp.toString(), "3")
+                mediaEvent.set(PlayerAnalyticsUnit.ma_w.toString(), player.videoSize.width.toString())
+
+                mediaEvent.set(PlayerAnalyticsUnit.ma_h.toString(), player.videoSize.height.toString())
+                mediaEvent.set(PlayerAnalyticsUnit.ma_fs.toString(), "0")
+                mediaEvent.set(PlayerAnalyticsUnit.ma_se.toString(), "")
+
+                TrackHelper.track(mediaEvent)
+                    .dimension(1, userInfoMap["cd_userId"])
+                    .dimension(2, if (subscriptionStatus == true)"PAID-USER" else "FREE-USER")
+                    .screen("")
+                    .with(PlayerUtils.getTracker(this@MainActivity))
+
+            }
+        }
+    }
+
+
+
 
     override fun onStart() {
         super.onStart()
@@ -89,66 +187,60 @@ class MainActivity : AppCompatActivity() {
         player.release()
     }
 
-    private fun setupExoWithAdd() {
-        // Set up the factory for media sources, passing the ads loader and ad view providers.
-        val dataSourceFactory: DataSource.Factory = DefaultDataSource.Factory(this)
-        val mediaSourceFactory: MediaSource.Factory =
-            DefaultMediaSourceFactory(dataSourceFactory)
-                .setLocalAdInsertionComponents(
-                    { adsLoader }, binding.playerView
-                )
-
-        // Create an ExoPlayer and set it as the player for content and ads.
-        player = ExoPlayer.Builder(this).setMediaSourceFactory(mediaSourceFactory).build()
-        binding.playerView.player = player
-        adsLoader.setPlayer(player)
-
-        // Create the MediaItem to play, specifying the content URI and ad tag URI.
-        val contentUri = Uri.parse(PlayerUtils.SAMPLE_VIDEO_URL)
-        val adTagUri = Uri.parse("")
-        val mediaItem = MediaItem.Builder()
-            .setUri(contentUri)
-            .setMimeType(MimeTypes.APPLICATION_MP4)
-            .setAdsConfiguration(MediaItem.AdsConfiguration.Builder(adTagUri).build())
-            .build()
-
-        // Prepare the content and ad to be played with the SimpleExoPlayer.
-        player.setMediaItem(mediaItem)
-        player.addListener(playBackStateListener())
-        //MATOMO
-        analyticsListener = PlayerAnalyticsListener(this,player)
-        player.addAnalyticsListener(analyticsListener)
-        player.prepare()
-        // Set PlayWhenReady. If true, content and ads will autoplay.
-        player.playWhenReady = true
+    fun getRandomString(length: Int) : String {
+        val charset = "ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz0123456789"
+        return (1..length)
+            .map { charset.random() }
+            .joinToString("")
     }
 
-    private fun playBackStateListener() = object : Player.Listener{
-        override fun onPlaybackStateChanged(playbackState: Int) {
-            if (playbackState == ExoPlayer.STATE_BUFFERING) {
+    private fun getRandomHex(length: Int) : String {
+        val charset = "abcdef0123456789"
+        return (1..length)
+            .map { charset.random() }
+            .joinToString("")
+    }
+    private fun checkSharedPrefData(): MutableMap<String, String> {
+        val sharedPreferences = getSharedPreferences("MyPrefs", Context.MODE_PRIVATE)
+        var userId = sharedPreferences.getString("userId", null)
+        var cdUserId = sharedPreferences.getString("cd_userId", null)
+        var cdSubscriptionStatus = sharedPreferences.getString("cd_SubscriptionStatus", null)
+        val resultMap = mutableMapOf<String, String>()
 
-            }
-            else if (playbackState == ExoPlayer.STATE_READY){
-
-                mediaEvent.set(PlayerAnalyticsUnit.ma_id.toString(), "goPlayID_FLUTTER")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_re.toString(), "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_mt.toString(), "video")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_ti.toString(), "BigBuckBunny")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_pn.toString(), "Media3_Flutter")
-
-                mediaEvent.set(PlayerAnalyticsUnit.ma_st.toString(), "11")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_le.toString(), "596")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_ps.toString(), "2")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_ttp.toString(), "3")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_w.toString(), "1280")
-
-                mediaEvent.set(PlayerAnalyticsUnit.ma_h.toString(), "720")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_fs.toString(), "0")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_se.toString(), "")
-
-                PlayerUtils.getTracker(this@MainActivity)!!.track(mediaEvent)
-                PlayerUtils.getTracker(this@MainActivity)!!.dispatch()
-            }
+        if (userId == null) {
+            val newUserId = getRandomString(10) // Function to generate a new user ID
+            sharedPreferences.edit().putString("userId", newUserId).apply()
+            userId = newUserId
         }
+        if (cdUserId == null){
+            val newCDUserId = getRandomString(10)
+            sharedPreferences.edit().putString("cd_userId", newCDUserId).apply()
+            cdUserId = newCDUserId
+        }
+        if (cdSubscriptionStatus == null){
+            val newCDSubscriptionStatus = "0"
+            sharedPreferences.edit().putString("cd_SubscriptionStatus", newCDSubscriptionStatus).apply()
+            cdSubscriptionStatus = newCDSubscriptionStatus
+        }
+
+        resultMap["userId"] = userId
+        resultMap["cd_userId"] = cdUserId
+        resultMap["cd_SubscriptionStatus"] = cdSubscriptionStatus
+
+        return resultMap
+    }
+
+    private fun checkException(userInfoMap: MutableMap<String, String>) {
+        if (userInfoMap.isEmpty()) reportException()
+        if (userInfoMap["userId"].isNullOrEmpty()) reportException()
+        if (userInfoMap["cd_userId"].isNullOrEmpty()) reportException()
+        if (userInfoMap["cd_SubscriptionStatus"].isNullOrEmpty()) reportException()
+    }
+    private fun reportException(){
+        TrackHelper.track()
+            .exception(Exception("Platform Channel Exception"))
+            .description("Exception regarding userId, subscription status, custom dimensions")
+            .fatal(false)
+            .with(PlayerUtils.getTracker(this@MainActivity))
     }
 }

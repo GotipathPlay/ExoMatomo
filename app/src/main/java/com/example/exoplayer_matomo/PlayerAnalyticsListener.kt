@@ -10,6 +10,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import org.matomo.sdk.extra.TrackHelper
 
 class PlayerAnalyticsListener(private val context: Context, private val player: ExoPlayer?) :
     AnalyticsListener {
@@ -17,7 +18,6 @@ class PlayerAnalyticsListener(private val context: Context, private val player: 
     private var lastKnownPlaybackPercent: Long = -1
     private var lastKnownPlaybackPos: Long = -1
 
-    //KOTLIN COROUTINE
     private var currentPositionTrackerJob: Job? = null
 
     private fun registerCurrentPositionTracker() {
@@ -31,12 +31,12 @@ class PlayerAnalyticsListener(private val context: Context, private val player: 
                     lastKnownPlaybackPos = currentPosition
                     lastKnownPlaybackPercent = percent
 
-                    MainActivity.mediaEvent.set(
-                        PlayerAnalyticsUnit.ma_st.toString(),
-                        (player.currentPosition.toInt() / 1000).toString()
-                    )
-                    PlayerUtils.getTracker(context)!!.track(MainActivity.mediaEvent)
-                    PlayerUtils.getTracker(context)!!.dispatch()
+                    MainActivity.mediaEvent.set(PlayerAnalyticsUnit.ma_st.toString(),(player.currentPosition.toInt() / 1000).toString())
+
+                    TrackHelper.track(MainActivity.mediaEvent)
+                        .screen("")
+                        .with(PlayerUtils.getTracker(context))
+
                 }
                 delay(10000) // Delay for 10 seconds
             }
