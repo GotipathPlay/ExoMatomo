@@ -111,28 +111,6 @@ class MainActivity : AppCompatActivity() {
 
             } else if (playbackState == ExoPlayer.STATE_READY || playbackState == 9 || playbackState == 8){
 
-                mediaEvent.set(PlayerAnalyticsUnit.ma_id.toString(), getRandomString(6))
-                mediaEvent.set(PlayerAnalyticsUnit.ma_re.toString(), PlayerUtils.mediaItemLinks[player.currentMediaItemIndex])
-                mediaEvent.set(PlayerAnalyticsUnit.ma_mt.toString(), "video")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_ti.toString(), "Title: " + PlayerUtils.mediaItemTitle[player.currentMediaItemIndex])
-                mediaEvent.set(PlayerAnalyticsUnit.ma_pn.toString(), "Media3_Flutter")
-
-                mediaEvent.set(PlayerAnalyticsUnit.ma_st.toString(), "0")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_le.toString(), (player.duration.toInt()/1000).toString())
-                mediaEvent.set(PlayerAnalyticsUnit.ma_ps.toString(), (player.currentPosition.toInt()/1000).toString())
-                mediaEvent.set(PlayerAnalyticsUnit.ma_ttp.toString(), "3")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_w.toString(), player.videoSize.width.toString())
-
-                mediaEvent.set(PlayerAnalyticsUnit.ma_h.toString(), player.videoSize.height.toString())
-                mediaEvent.set(PlayerAnalyticsUnit.ma_fs.toString(), "0")
-                mediaEvent.set(PlayerAnalyticsUnit.ma_se.toString(), "")
-
-                TrackHelper.track(mediaEvent)
-                    .dimension(1, userInfoMap["cd_userId"])
-                    .dimension(2, if (subscriptionStatus == true)"PAID-USER" else "FREE-USER")
-                    .screen("")
-                    .with(PlayerUtils.getTracker(this@MainActivity))
-
             }
         }
     }

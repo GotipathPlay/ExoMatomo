@@ -11,7 +11,8 @@ import org.matomo.sdk.TrackerBuilder
 class PlayerUtils {
     companion object{
         const val SAMPLE_VIDEO_URL = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
-        const val SAMPLE_VIDEO_URL_M3U8 = "https://vhx9nfhlsy.gpcdn.net/transcoded/2023/08/15/1008537/1/3/1835/manifest.m3u8"
+        const val SAMPLE_VIDEO_URL_M3U8 = "https://vhx9nfhlsy.gpcdn.net/transcoded/2022/11/05/985692/1/3/1835/manifest.m3u8"
+        const val SAMPLE_VIDEO_URL_M3U8_2 = "https://vhx9nfhlsy.gpcdn.net/transcoded/2023/08/13/1008438/1/3/1835/manifest.m3u8"
         const val SAMPLE_VIDEO_URL_DKnight = "https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4"
         const val SAMPLE_VIDEO_URL_Running = "https://storage.googleapis.com/gvabox/media/samples/stock.mp4"
         const val SAMPLE_VIDEO_URL_BigBuckBunny = "http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
@@ -23,10 +24,10 @@ class PlayerUtils {
 
         //MEDIA ITEMS
         private val firstMedia: Uri = Uri.parse(SAMPLE_VIDEO_URL_M3U8)
-        private val secondMedia: Uri = Uri.parse(SAMPLE_VIDEO_URL_M3U8)
+        private val secondMedia: Uri = Uri.parse(SAMPLE_VIDEO_URL_M3U8_2)
         private val thirdMedia: Uri = Uri.parse(SAMPLE_VIDEO_URL_M3U8)
         private val fourthMedia: Uri = Uri.parse(SAMPLE_VIDEO_URL_M3U8)
-        var mediaItemTitle = arrayListOf("BigBuckBunny", "Dark Knight", "Jogging", "Elephants Dream")
+        var mediaItemTitle = arrayListOf("Movie1", "Movie2", "Movie3", "Movie4")
         var mediaItemList: List<MediaItem> = ImmutableList.of(
             MediaItem.fromUri(firstMedia),
             MediaItem.fromUri(secondMedia),
@@ -40,6 +41,13 @@ class PlayerUtils {
             PlayerUtils.SAMPLE_VIDEO_URL_M3U8
         )
 
+        var mediaItemID = arrayListOf(
+            getRandomString(6),
+            getRandomString(6),
+            getRandomString(6),
+            getRandomString(6)
+        )
+
         private var tracker: Tracker? = null
         @Synchronized
         fun getTracker(context: Context): Tracker? {
@@ -48,6 +56,13 @@ class PlayerUtils {
                     .build(Matomo.getInstance(context))
             }
             return tracker
+        }
+
+        fun getRandomString(length: Int) : String {
+            val charset = "ABCDEFGHIJKLMNOPQRSTUVWXTZabcdefghiklmnopqrstuvwxyz0123456789"
+            return (1..length)
+                .map { charset.random() }
+                .joinToString("")
         }
     }
 
